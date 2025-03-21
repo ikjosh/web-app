@@ -1,0 +1,47 @@
+name: Deploy Web App
+
+on:
+  push:
+    branches:
+      - main  # Trigger workflow on push to main branch
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+
+    steps:
+    - name: Checkout repository
+      uses: actions/checkout@v3  # Get the latest code from GitHub
+
+    - name: Set up Docker Buildx
+      uses: docker/setup-buildx-action@v2  # Enable Docker Buildx for multi-platform builds
+
+    - name: Log in to Docker Hub
+      uses: docker/login-action@v2
+      with:
+        username: ${{ secrets.DOCKERHUB_USERNAME }}
+        password: ${{ secrets.DOCKERHUB_TOKEN }}
+
+    - name: Build and push Docker image
+      uses: docker/build-push-action@v3
+      with:
+        push: true
+        tags: ikjosh04/devops-webapp:latest
+
+  deploy:
+    runs-on: ubuntu-latest
+    needs: build  # Deploy job runs after build job
+
+    steps:
+    - name: SSH into Cloud VM and deploy
+      uses: appleboy/ssh-action@v0.1.10
+      with:
+        host: ${{ secrets.SERVER_IP }}
+        username: ubuntu
+        key: ${{ secrets.SSH_PRIVATE_KEY }}
+        script: |
+          docker pull ikjosh04/devops-webapp:latest
+          docker stop webapp || true
+          docker rm webapp || true
+          docker run -d -p 80:5000 --name webapp ikjosh04/devops-webapp:latest
+
